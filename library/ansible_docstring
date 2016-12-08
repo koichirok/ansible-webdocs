@@ -65,6 +65,7 @@ def main():
                 try:
                     try:
                         doc, plainexamples, returndocs = module_docs.get_docstring(path+mod)
+                        doc['returndocs'] = returndocs
                     except ValueError:
                         doc, plainexamples = module_docs.get_docstring(path+mod)
                     except Exception as e:
