@@ -41,7 +41,8 @@ EXAMPLES = '''
 '''
 
 from os import walk
-from ansible.utils import module_docs
+from ansible.plugins.loader import module_loader, fragment_loader
+from ansible.utils import plugin_docs
 
 
 def main():
@@ -61,13 +62,14 @@ def main():
     errors = []
     for (dirpath, dirnames, ansible_modules) in walk(path):
         if dirpath == path:
+            module_loader.add_directory(dirpath)
             for mod in ansible_modules:
-                try:
+                mod = os.path.splitext(mod)[0]  # removes the extension
+                in_path = module_loader.find_plugin(mod)
+                if in_path:
                     try:
-                        doc, plainexamples, returndocs = module_docs.get_docstring(path+mod)
+                        doc, plainexamples, returndocs, _ = plugin_docs.get_docstring(in_path, fragment_loader)
                         doc['returndocs'] = returndocs
-                    except ValueError:
-                        doc, plainexamples = module_docs.get_docstring(path+mod)
                     except Exception as e:
                         module.fail_json(msg='error', error=str(e))
 
@@ -80,10 +82,6 @@ def main():
                         continue
 
                     all_docs.append(doc)
-                except:
-                    errors.append(mod)
-                    errors.append('unknown')
-                    continue
 
     module.exit_json(results=all_docs, errors=errors)
 
