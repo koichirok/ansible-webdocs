@@ -28,42 +28,59 @@ options:
         default: null
         choices: []
         aliases: []
+    doc_fragments_path:
+        description:
+            - absolute path to a directory where the doc fragment(s) are stored
 '''
 
 EXAMPLES = '''
 # FULL PLAYBOOK EXAMPLE
   - name: get docs and examples for modules
-    ansible_docstring: path=/usr/share/ansible/files/
+    ansible_docstring:
+      path=/usr/share/ansible/files/
     register: modules
 
   - name: build web/markdown ansible docs
-    template: src=templates/ansible-docs.j2 dest=web/ansiblefilesdoc.md
+    template:
+      src: templates/ansible-docs.j2
+      dest: web/ansiblefilesdoc.md
 '''
 
 from os import walk
-from ansible.plugins.loader import module_loader, fragment_loader
+from ansible.plugins.loader import module_loader, PluginLoader
+from ansible.module_utils._text import to_native
 from ansible.utils import plugin_docs
 
 
 def main():
-
     module = AnsibleModule(
         argument_spec=dict(
-            path=dict(required=True),
+            path=dict(required=True, type='path'),
+            doc_fragments_path=dict(type='path',default=None),
         ),
         supports_check_mode=False
     )
 
-    path = module.params['path']
-    if path[-1] != '/':
-        path = path + '/'
+    path = os.path.normpath(module.params['path'])
+    if module.params['doc_fragments_path']:
+        fragment_loader = PluginLoader(
+            'ModuleDocFragment',
+            'ansible.utils.module_docs_fragments',
+            os.path.realpath(module.params['doc_fragments_path']),
+            ''
+        )
+    else:
+        from ansible.plugins.loader import fragment_loader
 
     all_docs = []
     errors = []
     for (dirpath, dirnames, ansible_modules) in walk(path):
-        if dirpath == path:
+        if os.path.normpath(dirpath) == path:
             module_loader.add_directory(dirpath)
             for mod in ansible_modules:
+                # skip dot files
+                if  mod.startswith('.'):
+                    continue
                 mod = os.path.splitext(mod)[0]  # removes the extension
                 in_path = module_loader.find_plugin(mod)
                 if in_path:
@@ -71,7 +88,7 @@ def main():
                         doc, plainexamples, returndocs, _ = plugin_docs.get_docstring(in_path, fragment_loader)
                         doc['returndocs'] = returndocs
                     except Exception as e:
-                        module.fail_json(msg='error', error=str(e))
+                        module.fail_json(msg='error processing file: {}: {}'.format(in_path,to_native(e)))
 
                     try:
                         examples_list = plainexamples.split('\n')
