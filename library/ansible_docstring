@@ -85,8 +85,9 @@ def main():
                 in_path = module_loader.find_plugin(mod)
                 if in_path:
                     try:
-                        doc, plainexamples, returndocs, _ = plugin_docs.get_docstring(in_path, fragment_loader)
+                        doc, plainexamples, returndocs, metadata = plugin_docs.get_docstring(in_path, fragment_loader)
                         doc['returndocs'] = returndocs
+                        doc['metadata'] = metadata
                     except Exception as e:
                         module.fail_json(msg='error processing file: {}: {}'.format(in_path,to_native(e)))
 
