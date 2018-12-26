@@ -4,7 +4,7 @@ __metaclass__ = type
 
 import re
 
-def markdown_ify(data):
+def markdown_ify(data, escape=True):
     '''
     U(url) -> url
     M(module) -> link to ansible module document
@@ -18,14 +18,20 @@ def markdown_ify(data):
     #data = re.sub(r'C%s' % paren_re, r'`\1`', data) # C(word) -> `word`
     #return data
     pos = 0
-    exp = re.compile(r'([UMIC])\(|[()]')
+    if escape:
+        exp = re.compile(r'([UMIC])\(|[_()]')
+    else:
+        exp = re.compile(r'([UMIC])\(|[()]')
     context = []
     result = []
     while True:
         m = exp.search(data,pos)
         if m is None:
             break
-        if m.group(0) == '(':
+        if m.group(0) == '_':
+            result.append(data[pos:m.start()])
+            result.append('\\' + data[m.start():m.end()])
+        elif m.group(0) == '(':
             context.append('(') 
             result.append(data[pos:m.end()])
         elif m.group(0) == ')':
@@ -58,6 +64,8 @@ def markdown_ify(data):
         pos = m.end()
     if not result:
         return data
+    if pos != len(data):
+        result.append(data[pos:len(data)])
     return "".join(result)
     
 
