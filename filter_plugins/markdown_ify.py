@@ -4,7 +4,7 @@ __metaclass__ = type
 
 import re
 
-def markdown_ify(data, escape=True):
+def markdown_ify(data):
     '''
     U(url) -> url
     M(module) -> link to ansible module document
@@ -18,10 +18,7 @@ def markdown_ify(data, escape=True):
     #data = re.sub(r'C%s' % paren_re, r'`\1`', data) # C(word) -> `word`
     #return data
     pos = 0
-    if escape:
-        exp = re.compile(r'([UMIC])\(|[_()]')
-    else:
-        exp = re.compile(r'([UMIC])\(|[()]')
+    exp = re.compile(r'([UMIC])\(|[()]')
     context = []
     result = []
     while True:
@@ -29,9 +26,10 @@ def markdown_ify(data, escape=True):
         if m is None:
             break
         if m.group(0) == '_':
-            result.append(data[pos:m.start()])
-            result.append('\\' + data[m.start():m.end()])
-        elif m.group(0) == '(':
+            if context[-1] not in 'UMIC':
+                result.append(data[pos:m.start()])
+                result.append('\\' + data[m.start():m.end()])
+        if m.group(0) == '(':
             context.append('(') 
             result.append(data[pos:m.end()])
         elif m.group(0) == ')':
@@ -43,9 +41,9 @@ def markdown_ify(data, escape=True):
                     result[-1] += data[pos:m.start()]
                 elif c == 'M':
                     t = result[-1] + data[pos:m.start()]
-                    result[-1] = '[%s](http://docs.ansible.com/ansible/%s_module.html)' % (t,t)
+                    result[-1] = '[%s](http://docs.ansible.com/ansible/%s_module.html)' % (markdown_escape(t),t)
                 elif c == 'I':
-                    t = result[-1] + data[pos:m.start()]
+                    t = markdown_escape(result[-1] + data[pos:m.start()])
                     if '_' in t:
                         s = '*'
                     else:
@@ -53,9 +51,9 @@ def markdown_ify(data, escape=True):
                     result[-1] = s+t+s
                 elif c == 'C':
                     t = result[-1] + data[pos:m.start()]
-                    result[-1] = '`%s`' % t
+                    result[-1] = '`%s`' % markdown_escape(t)
                 else: # context='('
-                    result[-1] += data[pos:m.end()]
+                    result[-1] += markdown_escape(data[pos:m.end()])
         else:
             # U()/M()/I()/C()
             result.append(data[pos:m.start()])
@@ -65,8 +63,12 @@ def markdown_ify(data, escape=True):
     if not result:
         return data
     if pos != len(data):
-        result.append(data[pos:len(data)])
+        result.append(markdown_escape(data[pos:len(data)]))
     return "".join(result)
+
+
+def markdown_escape(string):
+    return re.sub(r"([_*`])", r'\\\1', string)
     
 
 class FilterModule(object):
@@ -74,5 +76,6 @@ class FilterModule(object):
 
     def filters(self):
         return {
-            'markdown_ify': markdown_ify
+            'markdown_ify': markdown_ify,
+            'markdown_escape': markdown_escape,
         }
